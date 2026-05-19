@@ -34,6 +34,16 @@
             margin: 15px 0;
         }
 
+        .sortable {
+            cursor: pointer;
+            user-select: none;
+            transition: 0.15s;
+        }
+
+        .sortable:hover {
+            background: #1f56c2;
+        }
+
         input {
             flex: 1;
             padding: 10px 12px;
@@ -124,21 +134,50 @@
             <input id="q" placeholder="Search hostname / serial...">
             <button onclick="search()">Search</button>
             <button onclick="reset()">Reset</button>
+            <button onclick="exportCSV()">Export CSV</button>
         </div>
 
         <p id="count"></p>
 
         <table>
-            <thead>
-                <tr>
-                    <th>Platform</th>
-                    <th>Model</th>
-                    <th>Host</th>
-                    <th>Serial</th>
-                    <th>Expiry</th>
-                </tr>
-            </thead>
+        <thead>
+        <tr>
+            <th class="sortable"
+                data-key="platformType"
+                data-label="Platform"
+                onclick="sortTable('platformType')">
+                Platform
+            </th>
 
+            <th class="sortable"
+                data-key="model"
+                data-label="Model"
+                onclick="sortTable('model')">
+                Model
+            </th>
+
+            <th class="sortable"
+                data-key="hostName"
+                data-label="Host"
+                onclick="sortTable('hostName')">
+                Host
+            </th>
+
+            <th class="sortable"
+                data-key="serialNumber"
+                data-label="Serial"
+                onclick="sortTable('serialNumber')">
+                Serial
+            </th>
+
+            <th class="sortable"
+                data-key="expiry"
+                data-label="Expiry"
+                onclick="sortTable('expiry')">
+                Expiry
+            </th>
+        </tr>
+        </thead>
             <tbody id="tb"></tbody>
         </table>
 
@@ -148,6 +187,11 @@
 <script>
 
 let DATA = [];
+
+let CURRENT_DATA = [];
+
+let SORT_KEY = null;
+let SORT_ASC = true;
 
 async function load() {
 
@@ -168,6 +212,8 @@ async function load() {
 
 function render(data) {
 
+    CURRENT_DATA = [...data];
+
     document.getElementById("count").innerText =
         "Results: " + data.length;
 
@@ -183,6 +229,70 @@ function render(data) {
         `).join("");
 }
 
+function sortTable(key) {
+
+    if (SORT_KEY === key) {
+        SORT_ASC = !SORT_ASC;
+    } else {
+        SORT_KEY = key;
+        SORT_ASC = true;
+    }
+
+    CURRENT_DATA.sort((a, b) => {
+
+        let av = "";
+        let bv = "";
+
+        // nested fields
+        if (key === "model") {
+            av = a.hardwareModel?.name || "";
+            bv = b.hardwareModel?.name || "";
+        }
+        else if (key === "expiry") {
+            av = a.contract?.expiryDate || "";
+            bv = b.contract?.expiryDate || "";
+        }
+        else {
+            av = a[key] || "";
+            bv = b[key] || "";
+        }
+
+        av = String(av).toLowerCase();
+        bv = String(bv).toLowerCase();
+
+        // date sort
+        if (key === "expiry") {
+            av = new Date(av).getTime() || 0;
+            bv = new Date(bv).getTime() || 0;
+        }
+
+        if (av < bv) return SORT_ASC ? -1 : 1;
+        if (av > bv) return SORT_ASC ? 1 : -1;
+
+        return 0;
+    });
+
+    updateSortIcons();
+
+    render(CURRENT_DATA);
+}
+
+function updateSortIcons() {
+
+    document.querySelectorAll(".sortable")
+        .forEach(el => {
+
+            const key = el.dataset.key;
+
+            if (key === SORT_KEY) {
+                el.innerHTML =
+                    el.dataset.label +
+                    (SORT_ASC ? " ↑" : " ↓");
+            } else {
+                el.innerHTML = el.dataset.label;
+            }
+        });
+}
 
 function search() {
 
@@ -252,6 +362,82 @@ function formatExpiry(dateStr) {
             ${text}
         </span>
     `;
+}
+
+function formatDateOnly(dateStr) {
+
+    if (!dateStr) return "";
+
+    const date = new Date(dateStr);
+
+    if (isNaN(date.getTime())) {
+        return dateStr.split("T")[0];
+    }
+
+    return date.toISOString().split("T")[0];
+}
+
+function exportCSV() {
+
+    if (!CURRENT_DATA || CURRENT_DATA.length === 0) {
+        alert("No data to export");
+        return;
+    }
+
+    const rows = [];
+
+    // header
+    rows.push([
+        "Platform",
+        "Model",
+        "Host",
+        "Serial",
+        "Expiry"
+    ]);
+
+    // data
+    CURRENT_DATA.forEach(s => {
+
+        rows.push([
+            s.platformType || "",
+            s.hardwareModel?.name || "",
+            s.hostName || "",
+            s.serialNumber || "",
+            formatDateOnly(s.contract?.expiryDate)
+        ]);
+    });
+
+    // csv content
+    const csvContent = rows
+        .map(r =>
+            r.map(v =>
+                `"${String(v).replace(/"/g, '""')}"`
+            ).join(",")
+        )
+        .join("\n");
+
+    // UTF-8 BOM for Excel
+    const blob = new Blob(
+        ["\uFEFF" + csvContent],
+        { type: "text/csv;charset=utf-8;" }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+
+    a.href = url;
+
+    a.download =
+        "netapp_contracts.csv";
+
+    document.body.appendChild(a);
+
+    a.click();
+
+    document.body.removeChild(a);
+
+    URL.revokeObjectURL(url);
 }
 
 load();
