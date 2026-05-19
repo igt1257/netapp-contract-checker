@@ -2,32 +2,148 @@
 <html>
 <head>
     <title>Systems Dashboard</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: #f4f6f8;
+            color: #222;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+
+        h2 {
+            margin-bottom: 10px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        }
+
+        .top-bar {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            outline: none;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background: #2d6cdf;
+            color: white;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background: #1f56c2;
+        }
+
+        #status {
+            font-size: 14px;
+            color: #666;
+        }
+
+        #count {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #444;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            overflow: hidden;
+            border-radius: 10px;
+        }
+
+        thead {
+            background: #2d6cdf;
+            color: white;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        tbody tr {
+            background: white;
+            border-bottom: 1px solid #eee;
+            transition: 0.15s;
+        }
+
+        tbody tr:hover {
+            background: #f0f6ff;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            background: #eef3ff;
+            color: #2d6cdf;
+        }
+
+    </style>
 </head>
 
 <body>
 
-<h2>Systems Dashboard</h2>
+<div class="container">
 
-<p id="status">Loading...</p>
+    <h2>📊 Systems Dashboard</h2>
 
-<input id="q" placeholder="hostname / serial">
-<button onclick="search()">Search</button>
+    <div class="card">
 
-<p id="count"></p>
+        <p id="status">Loading...</p>
 
-<table border="1">
-    <thead>
-        <tr>
-            <th>Platform</th>
-            <th>Model</th>
-            <th>Host</th>
-            <th>Serial</th>
-            <th>Expiry</th>
-        </tr>
-    </thead>
+        <div class="top-bar">
+            <input id="q" placeholder="Search hostname / serial...">
+            <button onclick="search()">Search</button>
+            <button onclick="reset()">Reset</button>
+        </div>
 
-    <tbody id="tb"></tbody>
-</table>
+        <p id="count"></p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Platform</th>
+                    <th>Model</th>
+                    <th>Host</th>
+                    <th>Serial</th>
+                    <th>Expiry</th>
+                </tr>
+            </thead>
+
+            <tbody id="tb"></tbody>
+        </table>
+
+    </div>
+</div>
 
 <script>
 
@@ -35,13 +151,19 @@ let DATA = [];
 
 async function load() {
 
-    const res = await fetch("/api/systems");
-    const json = await res.json();
+    try {
+        const res = await fetch("/api/systems");
+        const json = await res.json();
 
-    DATA = json.data;
+        DATA = json.data || [];
 
-    document.getElementById("status").innerText =
-        "Ready: " + json.count;
+        document.getElementById("status").innerText =
+            "Ready ✔ Total: " + json.count;
+
+    } catch (e) {
+        document.getElementById("status").innerText =
+            "Failed to load data";
+    }
 }
 
 function render(data) {
@@ -51,24 +173,34 @@ function render(data) {
 
     document.getElementById("tb").innerHTML =
         data.map(s => `
-        <tr>
-            <td>${s.platformType || ""}</td>
-            <td>${s.hardwareModel?.name || ""}</td>
-            <td>${s.hostName || ""}</td>
-            <td>${s.serialNumber || ""}</td>
-            <td>${s.contract?.expiryDate || ""}</td>
-        </tr>
+            <tr>
+                <td><span class="badge">${s.platformType || "-"}</span></td>
+                <td>${s.hardwareModel?.name || "-"}</td>
+                <td>${s.hostName || "-"}</td>
+                <td>${s.serialNumber || "-"}</td>
+                <td>${s.contract?.expiryDate || "-"}</td>
+            </tr>
         `).join("");
 }
 
 function search() {
 
-    const k = document.getElementById("q").value.toLowerCase();
+    const k = document.getElementById("q").value.toLowerCase().trim();
+
+    if (!k) {
+        render(DATA);
+        return;
+    }
 
     render(DATA.filter(s =>
         (s.hostName || "").toLowerCase().includes(k) ||
         (s.serialNumber || "").toLowerCase().includes(k)
     ));
+}
+
+function reset() {
+    document.getElementById("q").value = "";
+    render(DATA);
 }
 
 load();
