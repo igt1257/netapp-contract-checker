@@ -207,10 +207,13 @@ def api_systems():
             })
 
     except Exception as e:
+        import traceback
+        print("🔥 API ERROR:", traceback.format_exc())
+
         return jsonify({
             "error": str(e),
+            "trace": traceback.format_exc(),
             "loading": False,
-            "count": 0,
             "data": []
         }), 500
 

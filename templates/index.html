@@ -67,7 +67,13 @@ async function load() {
 
     try {
         const res = await fetch("/api/systems");
-        const json = await res.json();
+
+        console.log("status =", res.status);
+
+        const text = await res.text();
+        console.log("raw response =", text);
+
+        const json = JSON.parse(text);
 
         if (json.error) {
             document.getElementById("status").innerText =
@@ -88,8 +94,9 @@ async function load() {
         DATA = json.data || [];
 
     } catch (e) {
+        console.error("frontend crash:", e);
         document.getElementById("status").innerText =
-            "Frontend error";
+            "Frontend Error (check console)";
     }
 }
 
