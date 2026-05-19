@@ -225,12 +225,27 @@ def api_systems():
 def index():
     return render_template("index.html")
 
+@app.before_request
+def init_loader_once():
+    global loader_started
+
+    if loader_started:
+        return
+
+    loader_started = True
+
+    print("🚀 Starting loader in background thread")
+
+    import threading
+    t = threading.Thread(target=load_all_systems)
+    t.daemon = True
+    t.start()
 
 # =========================
 # MAIN
 # =========================
 if __name__ == "__main__":
-
+    print("🔥 APP LOADED")
     start_loader()
     app.run(
         host="0.0.0.0",
