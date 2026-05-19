@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Systems Dashboard</title>
+
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        h2 { margin-bottom: 10px; }
+        input { width: 500px; padding: 8px; }
+        button { padding: 8px 15px; margin-left: 5px; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th {
+            background: #f0f0f0;
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+
+        tr:hover {
+            background: #fafafa;
+        }
+    </style>
+</head>
+
+<body>
+
+<h2>Systems Dashboard</h2>
+
+<p id="status">Loading backend data...</p>
+
+<input id="q" placeholder="hostname / serial">
+
+<button onclick="search()">Search</button>
+<button onclick="resetSearch()">Reset</button>
+
+<p id="count">Please search</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Platform</th>
+            <th>Model</th>
+            <th>Host</th>
+            <th>Serial</th>
+            <th>Expiry</th>
+        </tr>
+    </thead>
+
+    <tbody id="tb"></tbody>
+</table>
+
+<script>
+
+let DATA = [];
+
+async function load() {
+
+    try {
+        const res = await fetch("/api/systems");
+        const json = await res.json();
+
+        if (json.error) {
+            document.getElementById("status").innerText =
+                "ERROR: " + json.error;
+            return;
+        }
+
+        if (json.loading) {
+            document.getElementById("status").innerText =
+                "Loading... " + json.count;
+            setTimeout(load, 2000);
+            return;
+        }
+
+        document.getElementById("status").innerText =
+            "Loaded ✔ total = " + json.count;
+
+        DATA = json.data || [];
+
+    } catch (e) {
+        document.getElementById("status").innerText =
+            "Frontend error";
+    }
+}
+
+function render(data) {
+
+    document.getElementById("count").innerText =
+        "Showing: " + data.length;
+
+    document.getElementById("tb").innerHTML =
+        data.map(s => `
+            <tr>
+                <td>${s.platformType || ""}</td>
+                <td>${s.hardwareModel?.name || ""}</td>
+                <td>${s.hostName || ""}</td>
+                <td>${s.serialNumber || ""}</td>
+                <td>${s.contract?.expiryDate || ""}</td>
+            </tr>
+        `).join("");
+}
+
+function search() {
+
+    const keywords = (document.getElementById("q").value || "")
+        .split(/[,;\n]/)
+        .map(x => x.trim().toLowerCase())
+        .filter(Boolean);
+
+    if (!keywords.length) return;
+
+    const filtered = DATA.filter(s => {
+
+        const host = (s.hostName || "").toLowerCase();
+        const sn = (s.serialNumber || "").toLowerCase();
+
+        return keywords.some(k =>
+            host.includes(k) || sn.includes(k)
+        );
+    });
+
+    render(filtered);
+}
+
+function resetSearch() {
+    document.getElementById("q").value = "";
+    document.getElementById("tb").innerHTML = "";
+    document.getElementById("count").innerText = "Please search";
+}
+
+load();
+
+</script>
+
+</body>
+</html>
